@@ -4,7 +4,7 @@
 
 **English** | [中文](#sshctl-中文)
 
-High-performance cross-platform SSH/SCP CLI with an encrypted local server inventory.
+High-performance cross-platform SSH/SFTP sync CLI with an encrypted local server inventory.
 
 > **Built primarily for AI agents** (Cursor, Claude Code, Codex, and similar).
 > Stable, scriptable subcommands and JSON inventory make remote exec / SCP easy for tools to call without interactive prompts.
@@ -18,6 +18,7 @@ Agent skill (Cursor / Claude / Codex): [skills/sshctl/SKILL.md](skills/sshctl/SK
 - Single static binaries: Linux / Windows / macOS (amd64 + arm64)
 - Remote command execution and interactive shells
 - Fast file transfer via SFTP (`scp` subcommand, directories supported)
+- Native incremental upload (`rsync`) with dry-run, SHA-256 comparison, and scoped deletion
 - AES-256-GCM encrypted passwords at rest (`enc:v1:`)
 - Case-insensitive contains search on name / IP / description
 - Host key verification via `~/.ssh/known_hosts` (optional `--insecure` for labs)
@@ -28,7 +29,7 @@ Agent skill (Cursor / Claude / Codex): [skills/sshctl/SKILL.md](skills/sshctl/SK
 
 | Need | How sshctl helps |
 |------|------------------|
-| Non-interactive | `exec` / `scp` / `list` / `search` — no TTY prompts for common flows |
+| Non-interactive | `exec` / `scp` / `rsync` / `list` / `search` — no TTY prompts for common flows |
 | Discover hosts | `search -s <keyword>` on name, IP, description |
 | Safe-ish secrets | Passwords encrypted on disk; agents pass `--password` only when adding |
 | Predictable I/O | Tabular list output + non-zero exit on remote failure |
@@ -91,7 +92,23 @@ sshctl exec lab -- bash -lc 'cd /tmp && pwd'
 sshctl exec lab -- 'cd /tmp && pwd'
 sshctl shell lab
 sshctl scp ./app.tar.gz lab:/tmp/app.tar.gz
+sshctl scp source:/tmp/app.tar.gz test-a:/tmp/app.tar.gz test-b:/tmp/app.tar.gz
+sshctl rsync ./app-store prod:/srv/app-store --dry-run
+sshctl rsync ./app-store prod:/srv/app-store --delete
 ```
+
+`rsync` is implemented directly over SFTP, so Windows does not need a local
+`rsync` executable or exported SSH credentials. It currently supports
+local-to-remote synchronization. Files are compared by size and modification
+time by default; use `--checksum` when content identity matters more than scan
+speed. `--delete` refuses empty paths and remote roots, but should still be
+used only with a dedicated destination directory.
+
+For remote-to-remote copies, `scp` downloads the source once to a private
+staging directory under the local ArtifactCache, then uploads the unchanged
+files to each destination. Set the root with `--artifact-cache <path>` or
+`SSHCTL_ARTIFACT_CACHE`; otherwise the OS user cache directory is used. The
+per-run staging directory is removed when the command finishes.
 
 Config path priority: `--config` > `$SSHCTL_CONFIG` > `$SSHFRAC_CONFIG` > `~/.sshctl/servers.json`
 
@@ -187,6 +204,7 @@ MIT — see [LICENSE](LICENSE).
 - 单文件二进制：Linux / Windows / macOS（amd64 + arm64）
 - 远程命令执行、交互 Shell
 - 基于 SFTP 的高速传文件（`scp` 子命令，支持目录）
+- 原生增量上传（`rsync`），支持预演、SHA-256 比较和受限删除
 - 密码落盘 AES-256-GCM 加密（`enc:v1:`）
 - 对 name / IP / description 不区分大小写的包含搜索
 - 默认校验 `~/.ssh/known_hosts`（实验环境可用 `--insecure`）
@@ -197,7 +215,7 @@ MIT — see [LICENSE](LICENSE).
 
 | 需求 | sshctl 的做法 |
 |------|----------------|
-| 非交互 | `exec` / `scp` / `list` / `search`，常见流程不弹密码提示 |
+| 非交互 | `exec` / `scp` / `rsync` / `list` / `search`，常见流程不弹密码提示 |
 | 找机器 | `search -s <关键词>` 匹配名称、IP、描述 |
 | 密钥/密码 | 密码加密存储；Agent 仅在 `add` 时传入一次 `--password` |
 | 输出稳定 | 表格列表；远端失败返回非 0 退出码 |
@@ -241,7 +259,19 @@ sshctl exec lab -- bash -lc 'cd /tmp && pwd'
 sshctl exec lab -- 'cd /tmp && pwd'
 sshctl shell lab
 sshctl scp ./app.tar.gz lab:/tmp/app.tar.gz
+sshctl scp source:/tmp/app.tar.gz test-a:/tmp/app.tar.gz test-b:/tmp/app.tar.gz
+sshctl rsync ./app-store prod:/srv/app-store --dry-run
+sshctl rsync ./app-store prod:/srv/app-store --delete
 ```
+
+`rsync` 直接基于 SFTP 实现，Windows 无需安装本地 `rsync`，也无需导出 SSH
+凭据。当前支持从本地同步到远端；默认按大小和修改时间判断变化，需要内容级确认时加
+`--checksum`。`--delete` 会拒绝空路径和远端根目录，但仍应只对专用目标目录使用。
+
+远端到远端复制时，`scp` 会把源内容下载一次到本机 ArtifactCache 的独立暂存目录，
+再将内容不变地依次上传到所有目标。可通过 `--artifact-cache <路径>` 或
+`SSHCTL_ARTIFACT_CACHE` 指定缓存根目录；未指定时使用操作系统的用户缓存目录。
+命令结束后会清理本次暂存目录。
 
 配置优先级：`--config` > `$SSHCTL_CONFIG` > `$SSHFRAC_CONFIG` > `~/.sshctl/servers.json`
 

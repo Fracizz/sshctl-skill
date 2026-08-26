@@ -15,13 +15,13 @@ var (
 	masterPassword string
 	bindMachine    bool
 	// Version is overwritten by -ldflags at build time.
-	Version = "0.2.6"
+	Version = "0.3.0"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "sshctl",
-	Short: "AI-friendly SSH/SCP CLI with encrypted server inventory",
-	Long: `sshctl is a cross-platform SSH/SCP CLI designed primarily for AI agents.
+	Short: "AI-friendly SSH/SFTP sync CLI with encrypted server inventory",
+	Long: `sshctl is a cross-platform SSH/SFTP sync CLI designed primarily for AI agents.
 
 Exit codes:
   0   success
@@ -82,6 +82,7 @@ func init() {
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(shellCmd)
 	rootCmd.AddCommand(scpCmd)
+	rootCmd.AddCommand(rsyncCmd)
 	rootCmd.AddCommand(initCmd)
 }
 

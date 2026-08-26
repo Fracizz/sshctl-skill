@@ -26,8 +26,8 @@ Multi-platform release binaries (GitHub Actions on tag):
 
 ```bash
 # bump Version in cmd/root.go / scripts/build.ps1 as needed, then:
-git tag -a v0.2.6 -m "sshctl v0.2.6"
-git push origin v0.2.6
+git tag -a v0.3.0 -m "sshctl v0.3.0"
+git push origin v0.3.0
 # → .github/workflows/release.yml tests, builds 6 executables + sshctl-skill.zip, creates GitHub Release
 # Assets: sshctl-{linux,darwin,windows}-{amd64,arm64}[.exe] and sshctl-skill.zip
 ```

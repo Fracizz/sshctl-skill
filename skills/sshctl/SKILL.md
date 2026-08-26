@@ -1,9 +1,9 @@
 ---
 name: sshctl
 description: |
-  sshctl 远程主机 CLI（清单 search/exec/shell/scp/add/migrate/skills）。优先 sshctl，尽量不用原生 ssh/scp。
+  sshctl 远程主机 CLI（清单 search/exec/shell/scp/rsync/add/migrate/skills）。优先 sshctl，尽量不用原生 ssh/scp/rsync。
   二进制与技能同目录（SKILL.md 所在文件夹下的 bin/sshctl.exe），不安装到系统 PATH。
-  触发词：sshctl、search -s、exec、shell、scp、skills、servers.json、SSHCTL、.sshctl。
+  触发词：sshctl、search -s、exec、shell、scp、rsync、skills、servers.json、SSHCTL、.sshctl。
 ---
 
 # sshctl · 远程主机 CLI（Windows）
@@ -25,6 +25,8 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 | 远程执行 | `& $sshctl exec <host> -- <cmd>` |
 | 交互 shell | `& $sshctl shell <host>` |
 | 传文件 | `& $sshctl scp <src> <dst>` |
+| 远端中转/多目标 | `& $sshctl scp <remote-src> <remote-dst> [remote-dst...]` |
+| 增量同步 | `& $sshctl rsync <local-src> <host:remote-dst>` |
 | 写入清单 | `& $sshctl add --host ... --user ... --password '...'` |
 | 清单迁移 | `& $sshctl migrate` |
 | 列 skills | `& $sshctl skills` / `& $sshctl skills -s sshctl` |
@@ -43,7 +45,7 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 在仓库根目录交叉编译 6 平台可执行文件，同步到仓库 skill 与已存在的 `.claude` / `.cursor` / `.codex` skill `bin\`：
 
 ```powershell
-$env:VERSION = '0.2.6'
+$env:VERSION = '0.3.0'
 .\scripts\build.ps1
 ```
 
@@ -62,7 +64,7 @@ $env:VERSION = '0.2.6'
 ### 验证
 
 ```powershell
-& $sshctl version    # 0.2.6+
+& $sshctl version    # 0.3.0+
 & $sshctl skills -s sshctl
 & $sshctl list
 ```
@@ -92,7 +94,7 @@ $env:VERSION = '0.2.6'
 | `enc:v2` | 显式设主密码 | Argon2id + AES-GCM；适合多用户/共享机，需每次能拿到主密码 |
 | `enc:v2` + 机器绑定 | 另开 `--bind-machine` | 换机即使主密码相同也不可解 |
 
-**设计意图（默认路径）：** 加密只为「分享/拷贝 JSON 到别的机器失效」；日常本机 `add` / `exec` / `scp` **不要**向用户要主密码，也不要设 `SSHCTL_MASTER_PASSWORD`。
+**设计意图（默认路径）：** 加密只为「分享/拷贝 JSON 到别的机器失效」；日常本机 `add` / `exec` / `scp` / `rsync` **不要**向用户要主密码，也不要设 `SSHCTL_MASTER_PASSWORD`。
 
 **Agent 策略：**
 
@@ -127,9 +129,20 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 # 多参数会做 shell quote，可安全使用 bash -lc
 & $sshctl exec 192.168.x.x -- bash -lc 'cd /tmp && pwd'
 & $sshctl scp .\a.txt 192.168.x.x:C:/temp/a.txt
+& $sshctl scp source:/tmp/a.tar target-a:/tmp/a.tar target-b:/tmp/a.tar --artifact-cache Y:\ArtifactCache
+& $sshctl rsync .\app-store 192.168.x.x:/srv/app-store --dry-run
+& $sshctl rsync .\app-store 192.168.x.x:/srv/app-store --delete
 ```
 
-**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ `exec` / `scp`。首次连某主机若 host key 失败，见下节「首次连接」。
+大目录或重复发布优先使用 `rsync`：它复用加密清单，通过 SFTP 原生比较大小和修改时间，
+只上传变化文件。内容级验收可加 `--checksum`；机器可读汇总用 `--json`。`--delete`
+会拒绝空路径和远端根目录，但仍只允许用于明确的专用目标目录。
+
+`scp` 支持远端到远端及多个远端目标：源内容只下载一次到本机 ArtifactCache，再原样
+上传到各目标。缓存根目录可用 `--artifact-cache` 或 `SSHCTL_ARTIFACT_CACHE` 指定；
+未指定时使用系统用户缓存目录，命令结束后清理本次暂存目录。
+
+**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ `exec` / `scp` / `rsync`。首次连某主机若 host key 失败，见下节「首次连接」。
 
 ---
 
@@ -167,7 +180,7 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 
 ## 边界
 
-- 远程操作只用 `$sshctl`，不用原生 ssh/scp
+- 远程操作只用 `$sshctl`，不用原生 ssh/scp/rsync
 - **不**安装到系统 PATH（技能工作流）
 - 配免密 → **ssh-key-auth-setup**
 - 清单不入库；勿把主密码写入 skill / 仓库
