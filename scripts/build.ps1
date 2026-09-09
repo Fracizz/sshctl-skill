@@ -1,7 +1,7 @@
 # Local build: Windows/Linux/macOS (amd64+arm64) executables. Syncs into skill bins.
 # Multi-platform release binaries: push a v* tag → GitHub Actions (.github/workflows/release.yml).
 $ErrorActionPreference = "Stop"
-$Version = if ($env:VERSION) { $env:VERSION } else { "0.3.0" }
+$Version = if ($env:VERSION) { $env:VERSION } else { "0.4.0" }
 $ld = "-s -w -X github.com/Fracizz/sshctl/cmd.Version=$Version"
 $go = "go"
 if (Test-Path "C:\Program Files\Go\bin\go.exe") {

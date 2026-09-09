@@ -45,7 +45,7 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 在仓库根目录交叉编译 6 平台可执行文件，同步到仓库 skill 与已存在的 `.claude` / `.cursor` / `.codex` skill `bin\`：
 
 ```powershell
-$env:VERSION = '0.3.0'
+$env:VERSION = '0.4.0'
 .\scripts\build.ps1
 ```
 
@@ -64,7 +64,7 @@ $env:VERSION = '0.3.0'
 ### 验证
 
 ```powershell
-& $sshctl version    # 0.3.0+
+& $sshctl version    # 0.4.0+
 & $sshctl skills -s sshctl
 & $sshctl list
 ```
