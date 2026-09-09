@@ -22,7 +22,7 @@ Do **not** open a public issue for credential leaks or remote code execution.
 
 | Attacker | What they can do |
 |----------|------------------|
-| Network eavesdropper | Cannot read SSH session contents (SSH/SFTP). Host key verification (default) resists naive MITM; `--insecure` disables this. |
+| Network eavesdropper | Cannot read SSH session contents (SSH/SFTP). Default `--insecure` skips host key checks (no MITM resistance). `--secure` verifies against `known_hosts`. |
 | Same OS user, no master password | Can decrypt **enc:v1** inventory (machine-derived key). |
 | Same OS user, with master password | Needs `SSHCTL_MASTER_PASSWORD` / `--master-password` (and matching `--bind-machine` if used) to decrypt **enc:v2**. |
 | Other OS users | Should not read `servers.json` (mode 0600) or your private keys if permissions are correct. |
@@ -41,7 +41,7 @@ Do **not** open a public issue for credential leaks or remote code execution.
 2. Prefer **enc:v2** with a strong master password only on shared or multi-user machines, or when the user explicitly wants a portable secret they control.
 3. Optionally set `--bind-machine` / `SSHCTL_BIND_MACHINE=1` with enc:v2 so ciphertext will not decrypt on another host even with the same master password.
 4. Agents must not ask for a master password by default; if using enc:v2, pass it via env, never commit it.
-5. Do not use `--insecure` outside trusted labs.
+5. Default connections skip host key verification. Use `--secure` on untrusted networks after `known_hosts` is populated.
 6. Prefer SSH public keys (`key_file`) over passwords when possible.
 
 OS keychain integration is not built-in; wrap sshctl with a script that loads the secret from your keychain into `SSHCTL_MASTER_PASSWORD`.

@@ -22,4 +22,7 @@ func TestHostKeyCallbackMissingFile(t *testing.T) {
 	if !strings.Contains(err.Error(), "known_hosts") {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if !strings.Contains(err.Error(), "omit --secure") {
+		t.Fatalf("expected omit --secure hint, got: %v", err)
+	}
 }

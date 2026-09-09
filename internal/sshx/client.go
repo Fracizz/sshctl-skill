@@ -21,7 +21,7 @@ const copyBufSize = 256 * 1024
 // DialOptions controls SSH connection behavior.
 type DialOptions struct {
 	Timeout  time.Duration
-	Insecure bool // skip host key verification (not recommended)
+	Insecure bool // skip host key verification (CLI default)
 }
 
 // Dial opens an SSH client for the given server entry.
@@ -57,7 +57,7 @@ func hostKeyCallback(insecure bool) (ssh.HostKeyCallback, error) {
 	}
 	path := filepath.Join(home, ".ssh", "known_hosts")
 	if _, err := os.Stat(path); err != nil {
-		return nil, fmt.Errorf("known_hosts not found at %s (connect once with OpenSSH, or pass --insecure): %w", path, err)
+		return nil, fmt.Errorf("known_hosts not found at %s (connect once with OpenSSH, or omit --secure): %w", path, err)
 	}
 	cb, err := knownhosts.New(path)
 	if err != nil {

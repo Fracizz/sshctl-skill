@@ -22,11 +22,11 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 | 操作 | 命令 |
 |------|------|
 | 搜主机 | `& $sshctl search -s <关键词>` |
-| 远程执行 | `& $sshctl exec <host> -- <cmd>` |
-| 交互 shell | `& $sshctl shell <host>` |
-| 传文件 | `& $sshctl scp <src> <dst>` |
-| 远端中转/多目标 | `& $sshctl scp <remote-src> <remote-dst> [remote-dst...]` |
-| 增量同步 | `& $sshctl rsync <local-src> <host:remote-dst>` |
+| 远程执行 | `& $sshctl --insecure exec <host> -- <cmd>` |
+| 交互 shell | `& $sshctl --insecure shell <host>` |
+| 传文件 | `& $sshctl --insecure scp <src> <dst>` |
+| 远端中转/多目标 | `& $sshctl --insecure scp <remote-src> <remote-dst> [remote-dst...]` |
+| 增量同步 | `& $sshctl --insecure rsync <local-src> <host:remote-dst>` |
 | 写入清单 | `& $sshctl add --host ... --user ... --password '...'` |
 | 清单迁移 | `& $sshctl migrate` |
 | 列 skills | `& $sshctl skills` / `& $sshctl skills -s sshctl` |
@@ -106,7 +106,7 @@ $env:VERSION = '0.3.0'
 ```powershell
 # 默认无感（enc:v1，拷到别的机器失效）
 & $sshctl add --host 192.168.x.x --user root --password '...' --desc "..."
-& $sshctl exec 192.168.x.x -- "hostname"
+& $sshctl --insecure exec 192.168.x.x -- "hostname"
 
 # 仅用户明确要求主密码时
 $env:SSHCTL_MASTER_PASSWORD = '...'   # 用户自管，勿入库
@@ -125,13 +125,13 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 & $sshctl list
 & $sshctl search -s 192.168
 & $sshctl add --host 192.168.x.x --user administrator --password '...' --os Windows --desc "说明"
-& $sshctl exec 192.168.x.x -- "hostname && whoami"
+& $sshctl --insecure exec 192.168.x.x -- "hostname && whoami"
 # 多参数会做 shell quote，可安全使用 bash -lc
-& $sshctl exec 192.168.x.x -- bash -lc 'cd /tmp && pwd'
-& $sshctl scp .\a.txt 192.168.x.x:C:/temp/a.txt
-& $sshctl scp source:/tmp/a.tar target-a:/tmp/a.tar target-b:/tmp/a.tar --artifact-cache Y:\ArtifactCache
-& $sshctl rsync .\app-store 192.168.x.x:/srv/app-store --dry-run
-& $sshctl rsync .\app-store 192.168.x.x:/srv/app-store --delete
+& $sshctl --insecure exec 192.168.x.x -- bash -lc 'cd /tmp && pwd'
+& $sshctl --insecure scp .\a.txt 192.168.x.x:C:/temp/a.txt
+& $sshctl --insecure scp source:/tmp/a.tar target-a:/tmp/a.tar target-b:/tmp/a.tar --artifact-cache Y:\ArtifactCache
+& $sshctl --insecure rsync .\app-store 192.168.x.x:/srv/app-store --dry-run
+& $sshctl --insecure rsync .\app-store 192.168.x.x:/srv/app-store --delete
 ```
 
 大目录或重复发布优先使用 `rsync`：它复用加密清单，通过 SFTP 原生比较大小和修改时间，
@@ -142,27 +142,27 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 上传到各目标。缓存根目录可用 `--artifact-cache` 或 `SSHCTL_ARTIFACT_CACHE` 指定；
 未指定时使用系统用户缓存目录，命令结束后清理本次暂存目录。
 
-**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ `exec` / `scp` / `rsync`。首次连某主机若 host key 失败，见下节「首次连接」。
+**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ **默认加 `--insecure`** 再 `exec` / `scp` / `rsync`（不要问用户）。
 
 ---
 
 ## 首次连接 / host key
 
-默认校验 OpenSSH `~/.ssh/known_hosts`。新主机未写入时，`exec` / `scp` / `shell` 会失败（`unknown host key` / Handshake failed）。sshctl **不会**交互确认或自动写入 host key。
+**默认允许 `--insecure`：** 跳过 host key 校验。CLI 默认已是跳过；Agent 仍应显式加上，兼容旧二进制。sshctl **不会**交互确认或自动写入 `known_hosts`。
 
 | 场景 | 处理 |
 |------|------|
-| 可信实验网 / 临时连通测试 | `& $sshctl --insecure exec <host> -- "..."`（跳过校验；**不**写入 known_hosts） |
-| 正式环境 | 先用本机 OpenSSH 连一次写入 known_hosts，之后正常 `exec`，无需 `--insecure` |
+| 默认 / Agent 日常 | `& $sshctl --insecure exec <host> -- "..."`（跳过校验；**不**写入 known_hosts） |
+| 用户明确要求校验 | `& $sshctl --secure exec <host> -- "..."`（对照 `~/.ssh/known_hosts`） |
 
 ```powershell
-# 首次连通（仅可信环境）
+# 默认：显式 --insecure
 & $sshctl --insecure exec 192.168.x.x -- "hostname && uname -r"
-# known_hosts 已有记录后
-& $sshctl exec 192.168.x.x -- "hostname"
+# 仅用户要求校验 host key 时
+& $sshctl --secure exec 192.168.x.x -- "hostname"
 ```
 
-`--insecure` 是跳过校验，不是「自动接受并永久信任」。
+`--insecure` 与 CLI 默认行为相同；`--secure` 才启用 known_hosts。两者互斥。
 
 ---
 
@@ -174,7 +174,7 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 | duplicate host | `add` 同 IP 覆盖，或删 JSON 重复项 |
 | Windows 密码失败 | 确认密码完整；`--os Windows`；v0.2.1+ |
 | `bash -lc` 路径错乱 | 需 v0.2.3+（多参数已 shell quote） |
-| unknown host key / Handshake failed | 首次连接；可信环境加 `--insecure`，或先写入 known_hosts |
+| unknown host key / Handshake failed | 去掉 `--secure`（默认跳过校验），或先用 OpenSSH 写入 known_hosts |
 | decrypt failed / enc:v2 requires master password | 补上相同主密码与 `--bind-machine` 设置；或重新 `add` |
 | 仍用旧清单目录 | `& $sshctl migrate` |
 
@@ -185,4 +185,4 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 - 配免密 → **ssh-key-auth-setup**
 - 清单不入库；勿把主密码写入 skill / 仓库
 - 加密默认 `enc:v1`（本机无感、拷贝 JSON 换机失效）；`enc:v2` 仅用户明确要求时用
-- 非可信网络避免 `--insecure`
+- host key **默认允许 `--insecure`**（连接时加上，勿问用户）；仅用户明确要求时改用 `--secure`

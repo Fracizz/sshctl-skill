@@ -21,7 +21,7 @@ Agent skill (Cursor / Claude / Codex): [skills/sshctl/SKILL.md](skills/sshctl/SK
 - Native incremental upload (`rsync`) with dry-run, SHA-256 comparison, and scoped deletion
 - AES-256-GCM encrypted passwords at rest (`enc:v1:`)
 - Case-insensitive contains search on name / IP / description
-- Host key verification via `~/.ssh/known_hosts` (optional `--insecure` for labs)
+- Host key verification skipped by default (`--insecure`); pass `--secure` to check `~/.ssh/known_hosts`
 - Default config outside the repo: `~/.sshctl/servers.json`
 - One-time migration from `~/.sshfrac` / `~/.invossh` (automatic or `sshctl migrate`)
 
@@ -158,7 +158,7 @@ sshctl completion powershell > sshctl.ps1
 sshctl completion bash > /etc/bash_completion.d/sshctl
 ```
 
-First SSH to a host should populate OpenSSH `known_hosts` (or pass `--insecure` only in trusted labs).
+Host key verification is skipped by default. Pass `--secure` to check OpenSSH `~/.ssh/known_hosts`.
 
 ## JSON format
 
@@ -207,7 +207,7 @@ MIT — see [LICENSE](LICENSE).
 - 原生增量上传（`rsync`），支持预演、SHA-256 比较和受限删除
 - 密码落盘 AES-256-GCM 加密（`enc:v1:`）
 - 对 name / IP / description 不区分大小写的包含搜索
-- 默认校验 `~/.ssh/known_hosts`（实验环境可用 `--insecure`）
+- 默认跳过 host key 校验（`--insecure`）；需要校验时加 `--secure` 对照 `~/.ssh/known_hosts`
 - 配置默认在仓库外：`~/.sshctl/servers.json`
 - 从 `~/.sshfrac` / `~/.invossh` 一次性迁移（自动或 `sshctl migrate`）
 
@@ -317,7 +317,7 @@ sshctl version
 sshctl completion powershell > sshctl.ps1
 ```
 
-首次连接请先写入 OpenSSH `known_hosts`（或仅在可信实验环境使用 `--insecure`）。
+默认跳过 host key 校验。需要校验时加 `--secure`，对照 OpenSSH `~/.ssh/known_hosts`。
 
 ## 安全说明
 

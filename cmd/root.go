@@ -12,6 +12,7 @@ import (
 var (
 	cfgPath        string
 	insecure       bool
+	secure         bool
 	masterPassword string
 	bindMachine    bool
 	// Version is overwritten by -ldflags at build time.
@@ -47,6 +48,7 @@ Shell completion:
 	SilenceErrors: true,
 	Version:       Version,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		insecure = resolveInsecure(insecure, secure)
 		if masterPassword != "" {
 			crypto.SetMasterPassword(masterPassword)
 		}
@@ -67,7 +69,9 @@ func Execute() error {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "path to servers JSON (default: ~/.sshctl/servers.json or $SSHCTL_CONFIG)")
-	rootCmd.PersistentFlags().BoolVar(&insecure, "insecure", false, "skip SSH host key verification (unsafe; for lab only)")
+	rootCmd.PersistentFlags().BoolVar(&insecure, "insecure", true, "skip SSH host key verification (default)")
+	rootCmd.PersistentFlags().BoolVar(&secure, "secure", false, "verify SSH host key against ~/.ssh/known_hosts")
+	rootCmd.MarkFlagsMutuallyExclusive("insecure", "secure")
 	rootCmd.PersistentFlags().StringVar(&masterPassword, "master-password", "", "master password for enc:v2 (or set SSHCTL_MASTER_PASSWORD)")
 	rootCmd.PersistentFlags().BoolVar(&bindMachine, "bind-machine", false, "mix machine identity into enc:v2 KDF (or SSHCTL_BIND_MACHINE=1)")
 
@@ -84,6 +88,13 @@ func init() {
 	rootCmd.AddCommand(scpCmd)
 	rootCmd.AddCommand(rsyncCmd)
 	rootCmd.AddCommand(initCmd)
+}
+
+func resolveInsecure(insecureFlag, secureFlag bool) bool {
+	if secureFlag {
+		return false
+	}
+	return insecureFlag
 }
 
 var versionCmd = &cobra.Command{
