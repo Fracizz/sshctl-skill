@@ -1,9 +1,9 @@
 ---
 name: sshctl
 description: |
-  sshctl 远程主机 CLI（清单 search/exec/shell/scp/rsync/add/migrate/skills）。优先 sshctl，尽量不用原生 ssh/scp/rsync。
+  sshctl 远程主机 CLI（清单 search/exec/shell/scp/rsync/add/migrate/backup/import/skills）。优先 sshctl，尽量不用原生 ssh/scp/rsync。
   二进制与技能同目录（SKILL.md 所在文件夹下的 bin/sshctl.exe），不安装到系统 PATH。
-  触发词：sshctl、search -s、exec、shell、scp、rsync、skills、servers.json、SSHCTL、.sshctl。
+  触发词：sshctl、search -s、exec、shell、scp、rsync、backup、import、skills、servers.json、SSHCTL、.sshctl。
 ---
 
 # sshctl · 远程主机 CLI（Windows）
@@ -29,7 +29,10 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 | 增量同步 | `& $sshctl --insecure rsync <local-src> <host:remote-dst>` |
 | 写入清单 | `& $sshctl add --host ... --user ... --password '...'` |
 | 清单迁移 | `& $sshctl migrate` |
+| 备份清单 | `& $sshctl backup` / `& $sshctl backup -o D:\safe\servers.json` |
+| 导入清单 | `& $sshctl import <备份文件>`（先自动快照当前清单） |
 | 列 skills | `& $sshctl skills` / `& $sshctl skills -s sshctl` |
+| 升级技能 | `& $sshctl skills install --zip <sshctl-skill.zip>`（先备份清单，只覆盖 SKILL.md + bin/） |
 
 ---
 
@@ -45,15 +48,25 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 在仓库根目录交叉编译 6 平台可执行文件，同步到仓库 skill 与已存在的 `.claude` / `.cursor` / `.codex` skill `bin\`：
 
 ```powershell
-$env:VERSION = '0.4.0'
+$env:VERSION = '0.5.0'
 .\scripts\build.ps1
 ```
 
-`bin/` 下二进制 **不入库**。也可从 [Releases](https://github.com/Fracizz/sshctl/releases) 获取：
+`bin/` 下二进制 **不入库**。也可从 [Releases](https://github.com/Fracizz/sshctl/releases) 获取。
+
+**升级安装（必须 overlay，禁止删目录重装）：** 只覆盖 `SKILL.md` 与 `bin/`。清单和密文只在 `%USERPROFILE%\.sshctl\servers.json`，与技能目录无关。升级技能**不得** `Remove-Item -Recurse` 整个 `sshctl` 文件夹，不得 `sshctl init`，不得改写 `servers.json`，不得用会清空目标目录的 `npx skills add --copy`。
+
+```powershell
+# 升级前可单独备份；skills install 也会自动备份 ~/.sshctl/servers.json
+& $sshctl backup
+& $sshctl skills install --zip $env:TEMP\sshctl-skill.zip
+# 升级后若清单异常，从备份导入（密文原样恢复）
+& $sshctl import "$env:USERPROFILE\.sshctl\backups\servers-20260912-154800.json"
+```
 
 | 资源 | 说明 |
 |------|------|
-| `sshctl-skill.zip` | **AI skills 整包**：解压到 `~/.claude/skills/` / `~/.cursor/skills/` / `~/.codex/skills/` |
+| `sshctl-skill.zip` | **AI skills 整包**：`sshctl skills install --zip` overlay，不要先删技能目录 |
 | `sshctl-windows-amd64.exe` | Windows x64（Agent 默认可作 `bin/sshctl.exe`） |
 | `sshctl-windows-arm64.exe` | Windows ARM64 |
 | `sshctl-linux-amd64` / `sshctl-linux-arm64` | Linux x64 / ARM64 |
@@ -64,7 +77,7 @@ $env:VERSION = '0.4.0'
 ### 验证
 
 ```powershell
-& $sshctl version    # 0.4.0+
+& $sshctl version    # 0.5.0+
 & $sshctl skills -s sshctl
 & $sshctl list
 ```
@@ -76,13 +89,14 @@ $env:VERSION = '0.4.0'
 | 项 | 路径 / 变量 |
 |----|-------------|
 | 清单 | `%USERPROFILE%\.sshctl\servers.json` |
+| 备份目录 | `%USERPROFILE%\.sshctl\backups\servers-时间戳.json` |
 | 迁移 | `& $sshctl migrate`（`~/.sshfrac` → `~/.sshctl`，旧文件改 `.bak`） |
 | 覆盖 | `$SSHCTL_CONFIG` |
 | Legacy | `$SSHFRAC_CONFIG`（显式指定时） |
 | 主密码（可选） | `--master-password` / `$SSHCTL_MASTER_PASSWORD` → 才走 `enc:v2`；默认不需要 |
 | 机器绑定（仅 v2） | `--bind-machine` / `$SSHCTL_BIND_MACHINE=1`；`enc:v1` 已本机绑定 |
 
-**规则：** 每个 IP 仅一条；`add` 同 IP 覆盖；密码特殊字符须完整引号包裹。
+**规则：** 每个 IP 仅一条；`add` 同 IP **合并更新**（未传的 `--password` / `--desc` / `--os` / `--key` / `--name` / `--port` 保留原值，不丢密文和描述）；密码特殊字符须完整引号包裹。仅当用户明确给新值时才改对应字段。
 
 ### 清单密码加密（对称）
 
@@ -122,6 +136,8 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 
 ```powershell
 & $sshctl migrate
+& $sshctl backup
+& $sshctl import "$env:USERPROFILE\.sshctl\backups\servers-20260912-154800.json"
 & $sshctl list
 & $sshctl search -s 192.168
 & $sshctl add --host 192.168.x.x --user administrator --password '...' --os Windows --desc "说明"
@@ -142,7 +158,7 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 上传到各目标。缓存根目录可用 `--artifact-cache` 或 `SSHCTL_ARTIFACT_CACHE` 指定；
 未指定时使用系统用户缓存目录，命令结束后清理本次暂存目录。
 
-**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ **默认加 `--insecure`** 再 `exec` / `scp` / `rsync`（不要问用户）。
+**Agent 流程：** `search -s` → 不在清单则 `add`（确认凭据；**默认 enc:v1 无感**，勿要主密码）→ 已在清单则只 `add` 要改的字段（**不要**为改描述/用户而重填密码）→ **默认加 `--insecure`** 再 `exec` / `scp` / `rsync`（不要问用户）。
 
 ---
 
@@ -170,8 +186,9 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 
 | 情况 | 处理 |
 |------|------|
-| 找不到 sshctl | 构建/复制到 `$skillRoot\bin\sshctl.exe` |
-| duplicate host | `add` 同 IP 覆盖，或删 JSON 重复项 |
+| 找不到 sshctl | 构建/复制到 `$skillRoot\bin\sshctl.exe`；升级后 bin 丢失说明被整目录覆盖，改用 `skills install --zip` |
+| 升级后清单/密文没了 | `& $sshctl import` 最近的 `~/.sshctl\backups\servers-*.json`；禁止 `init` 覆盖 |
+| duplicate host | `add` 同 IP 合并更新，或删 JSON 重复项 |
 | Windows 密码失败 | 确认密码完整；`--os Windows`；v0.2.1+ |
 | `bash -lc` 路径错乱 | 需 v0.2.3+（多参数已 shell quote） |
 | unknown host key / Handshake failed | 去掉 `--secure`（默认跳过校验），或先用 OpenSSH 写入 known_hosts |
@@ -182,6 +199,8 @@ $env:SSHCTL_BIND_MACHINE = '1'        # 可选
 
 - 远程操作只用 `$sshctl`，不用原生 ssh/scp/rsync
 - **不**安装到系统 PATH（技能工作流）
+- 升级技能只用 `skills install --zip` overlay；**禁止**删除 `skills/sshctl` 目录
+- 清单只在 `~/.sshctl\servers.json`；升级前 `backup`，出错用 `import` 恢复，勿手改密文
 - 配免密 → **ssh-key-auth-setup**
 - 清单不入库；勿把主密码写入 skill / 仓库
 - 加密默认 `enc:v1`（本机无感、拷贝 JSON 换机失效）；`enc:v2` 仅用户明确要求时用

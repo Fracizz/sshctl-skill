@@ -84,6 +84,62 @@ func TestAddReplacesDuplicateHost(t *testing.T) {
 	}
 }
 
+func TestAddUpdateKeepsOmittedPasswordAndDescription(t *testing.T) {
+	f := &config.File{}
+	if _, err := f.Add(config.Server{
+		Name:        "lab",
+		Host:        "192.0.2.10",
+		User:        "root",
+		Password:    "secret",
+		OS:          "Windows",
+		Port:        2222,
+		Description: "build agent",
+		KeyFile:     "C:/keys/lab.pem",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	oldCipher := f.Servers[0].Password
+	if !crypto.IsEncrypted(oldCipher) {
+		t.Fatal("expected ciphertext after first add")
+	}
+
+	updated, err := f.Add(config.Server{Host: "192.0.2.10", User: "administrator"})
+	if err != nil || !updated {
+		t.Fatalf("update: updated=%v err=%v", updated, err)
+	}
+	got := f.Servers[0]
+	if got.Password != oldCipher {
+		t.Fatalf("password ciphertext overwritten: %q", got.Password)
+	}
+	if got.Description != "build agent" || got.Name != "lab" || got.OS != "Windows" || got.Port != 2222 || got.KeyFile != "C:/keys/lab.pem" {
+		t.Fatalf("history fields lost: %#v", got)
+	}
+	if got.User != "administrator" {
+		t.Fatalf("user not updated: %#v", got)
+	}
+	plain, err := got.PlainPassword()
+	if err != nil || plain != "secret" {
+		t.Fatalf("decrypt after merge: %v %q", err, plain)
+	}
+}
+
+func TestAddUpdateReplacesExplicitPassword(t *testing.T) {
+	f := &config.File{}
+	if _, err := f.Add(config.Server{Host: "192.0.2.10", User: "root", Password: "old"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Add(config.Server{Host: "192.0.2.10", Password: "new"}); err != nil {
+		t.Fatal(err)
+	}
+	plain, err := f.Servers[0].PlainPassword()
+	if err != nil || plain != "new" {
+		t.Fatalf("decrypt: %v %q", err, plain)
+	}
+	if f.Servers[0].User != "root" {
+		t.Fatalf("user should be kept: %#v", f.Servers[0])
+	}
+}
+
 func TestLoadRejectsDuplicateHost(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "servers.json")

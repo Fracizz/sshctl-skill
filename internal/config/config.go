@@ -194,14 +194,54 @@ func (s *Server) PlainPassword() (string, error) {
 	return crypto.Decrypt(s.Password)
 }
 
-// Add inserts or replaces the server for a host. Each host/IP may appear only once.
-// Returns true when an existing host entry was replaced.
+// LookupHost returns the inventory entry for host/IP, or nil.
+func (f *File) LookupHost(host string) *Server {
+	target := normalizeHost(host)
+	if target == "" {
+		return nil
+	}
+	for i := range f.Servers {
+		if normalizeHost(f.Servers[i].Host) == target {
+			return &f.Servers[i]
+		}
+	}
+	return nil
+}
+
+func mergeServerUpdate(old, neu Server) Server {
+	if neu.Name == "" {
+		neu.Name = old.Name
+	}
+	if neu.Description == "" {
+		neu.Description = old.Description
+	}
+	if neu.User == "" {
+		neu.User = old.User
+	}
+	if neu.Password == "" {
+		neu.Password = old.Password
+	}
+	if neu.OS == "" {
+		neu.OS = old.OS
+	}
+	if neu.KeyFile == "" {
+		neu.KeyFile = old.KeyFile
+	}
+	if neu.Port == 0 {
+		neu.Port = old.Port
+	}
+	if neu.Host == "" {
+		neu.Host = old.Host
+	}
+	return neu
+}
+
+// Add inserts or updates the server for a host. Each host/IP may appear only once.
+// Empty fields on update keep the previous values (description, ciphertext, key, …).
+// Returns true when an existing host entry was updated.
 func (f *File) Add(s Server) (bool, error) {
 	if normalizeHost(s.Host) == "" {
 		return false, fmt.Errorf("host is required")
-	}
-	if s.Port == 0 {
-		s.Port = 22
 	}
 	if s.Password != "" && !crypto.IsEncrypted(s.Password) {
 		enc, err := crypto.Encrypt(s.Password)
@@ -213,9 +253,16 @@ func (f *File) Add(s Server) (bool, error) {
 	target := normalizeHost(s.Host)
 	for i := range f.Servers {
 		if normalizeHost(f.Servers[i].Host) == target {
+			s = mergeServerUpdate(f.Servers[i], s)
+			if s.Port == 0 {
+				s.Port = 22
+			}
 			f.Servers[i] = s
 			return true, nil
 		}
+	}
+	if s.Port == 0 {
+		s.Port = 22
 	}
 	f.Servers = append(f.Servers, s)
 	return false, nil

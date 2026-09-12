@@ -22,13 +22,14 @@ var (
 
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "Add a server (password is encrypted on save)",
+	Short: "Add or update a server (password is encrypted on save)",
+	Long: `Add a new host or update an existing one (matched by IP/host).
+
+Unspecified fields are kept on update: description, encrypted password,
+user, OS, key, name, and port are not cleared just because a flag was omitted.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if addHost == "" || addUser == "" {
-			return fmt.Errorf("--host and --user are required")
-		}
-		if addName == "" {
-			addName = addHost
+		if addHost == "" {
+			return fmt.Errorf("--host is required")
 		}
 		path := config.ResolvePath(cfgPath)
 		var f *config.File
@@ -43,29 +44,60 @@ var addCmd = &cobra.Command{
 			}
 			f = loaded
 		}
-		updated, err := f.Add(config.Server{
-			Name:        addName,
-			Description: addDescription,
-			Host:        addHost,
-			Port:        addPort,
-			User:        addUser,
-			Password:    addPassword,
-			OS:          addOS,
-			KeyFile:     addKeyFile,
-		})
+		existing := f.LookupHost(addHost) != nil
+		if !existing && addUser == "" {
+			return fmt.Errorf("--user is required when adding a new host")
+		}
+		updated, err := f.Add(serverFromAddFlags(cmd, existing))
 		if err != nil {
 			return err
 		}
 		if err := config.Save(path, f); err != nil {
 			return err
 		}
+		saved := f.LookupHost(addHost)
+		if saved == nil {
+			return fmt.Errorf("save succeeded but host %s not found", addHost)
+		}
 		verb := "added"
 		if updated {
 			verb = "updated"
 		}
-		fmt.Printf("%s %s (%s@%s) -> %s\n", verb, addName, addUser, addHost, path)
+		fmt.Printf("%s %s (%s@%s) -> %s\n", verb, saved.Name, saved.User, saved.Host, path)
 		return nil
 	},
+}
+
+func serverFromAddFlags(cmd *cobra.Command, existing bool) config.Server {
+	s := config.Server{Host: addHost}
+	if cmd.Flags().Changed("name") {
+		s.Name = addName
+	} else if !existing {
+		s.Name = addHost
+	}
+	if cmd.Flags().Changed("desc") {
+		s.Description = addDescription
+	}
+	if cmd.Flags().Changed("port") {
+		s.Port = addPort
+	} else if !existing {
+		s.Port = addPort
+	}
+	if cmd.Flags().Changed("user") || !existing {
+		s.User = addUser
+	}
+	if cmd.Flags().Changed("password") {
+		s.Password = addPassword
+	}
+	if cmd.Flags().Changed("os") {
+		s.OS = addOS
+	} else if !existing {
+		s.OS = addOS
+	}
+	if cmd.Flags().Changed("key") {
+		s.KeyFile = addKeyFile
+	}
+	return s
 }
 
 func init() {

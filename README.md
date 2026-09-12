@@ -58,7 +58,7 @@ $sshctl = Join-Path $skillRoot 'bin\sshctl.exe'
 
 | Asset | Notes |
 |-------|--------|
-| `sshctl-skill.zip` | **AI skill pack** — unzip into `~/.claude/skills/`, `~/.cursor/skills/`, or `~/.codex/skills/` |
+| `sshctl-skill.zip` | **AI skill pack** — `sshctl skills install --zip` overlays `SKILL.md` + `bin/` (does not wipe inventory) |
 | Windows x64 / ARM64 | `sshctl-windows-amd64.exe` / `sshctl-windows-arm64.exe` |
 | Linux x64 / ARM64 | `sshctl-linux-amd64` / `sshctl-linux-arm64` |
 | macOS Intel / Apple Silicon | `sshctl-darwin-amd64` / `sshctl-darwin-arm64` |
@@ -79,6 +79,8 @@ sshctl init
 
 # Add a host (password is encrypted on save)
 sshctl add --name lab --host 192.0.2.10 --user root --password 'secret' --desc "lab box"
+# Same IP updates in place; omitted flags keep description and ciphertext
+sshctl add --host 192.0.2.10 --user administrator
 
 # Or key-based auth
 sshctl add --name prod --host 192.0.2.11 --user root --key ~/.ssh/id_ed25519 --desc "prod"
@@ -234,7 +236,7 @@ go build -o skills/sshctl/bin/sshctl.exe .
 技能说明：[skills/sshctl/SKILL.md](skills/sshctl/SKILL.md) — `$skillRoot` 为本 `SKILL.md` 所在目录，通过 `$sshctl = Join-Path $skillRoot 'bin\sshctl.exe'` 调用。
 
 `skills/sshctl/bin/` 不入库；克隆后需本地构建，或从 [Releases](https://github.com/Fracizz/sshctl/releases) 下载：
-- **`sshctl-skill.zip`**（AI skills 整包）：解压到 `~/.claude/skills/` / `~/.cursor/skills/` / `~/.codex/skills/`
+- **`sshctl-skill.zip`**（AI skills 整包）：`sshctl skills install --zip` overlay 到已有技能目录，不要先删文件夹
 - 或单平台裸二进制（Windows 用 `sshctl-windows-amd64.exe`，Agent 默认可作 `bin/sshctl.exe`）
 
 **通用 CLI（可选）：**
@@ -248,6 +250,8 @@ go install github.com/Fracizz/sshctl@latest
 ```bash
 sshctl init
 sshctl add --name lab --host 192.0.2.10 --user root --password 'secret' --desc "实验机"
+# 同 IP 合并更新：没传的描述、密文、密钥等会保留
+sshctl add --host 192.0.2.10 --user administrator
 sshctl add --name prod --host 192.0.2.11 --user root --key ~/.ssh/id_ed25519 --desc "生产"
 
 sshctl list
